@@ -1,5 +1,6 @@
 import math
 
+
 # def post_design(wind_zone, post_height, k_factor_variable, return_corners, pressure, horizontal_udl):
 #     width = int(input(wind_zone + " post width (in mm): "))
 #     depth = int(input(wind_zone + " post depth (in mm): "))
@@ -12,6 +13,36 @@ import math
 #     timber_grade = {"c16": 7.42, "24": 10.50}
 #     timber_grade = timber_grade.get(str(timber_grade))
 #     print("Yay it worked!")
+
+
+def k_reduction_factor(height, length):
+    l_h = length / height
+    lh_list = (3, 5, 10, 15)
+    k_list = (0.6, 0.7, 0.9, 1.0)
+    if l_h <= 3:
+        k_factor = 0.6
+    elif (l_h > 3) and (l_h < 5):
+        x1 = lh_list[0]
+        x2 = lh_list[1]
+        y1 = k_list[0]
+        y2 = k_list[1]
+        k_factor = y1 + ((l_h - x1) * ((y2 - y1) / (x2 - x1)))
+    elif (l_h > 5) and (l_h < 10):
+        x1 = lh_list[1]
+        x2 = lh_list[2]
+        y1 = k_list[1]
+        y2 = k_list[2]
+        k_factor = y1 + ((l_h - x1) * ((y2 - y1) / (x2 - x1)))
+    elif (l_h > 10) and (l_h < 15):
+        x1 = lh_list[2]
+        x2 = lh_list[3]
+        y1 = k_list[2]
+        y2 = k_list[3]
+        k_factor = y1 + ((l_h - x1) * ((y2 - y1) / (x2 - x1)))
+    else:
+        k_factor = 1
+    print("k reduction factor = " + str(round(k_factor, 2)))
+    return k_factor
 
 
 def interpolation(height, km, x_axis_distance_list, y_axis_height_list, table_figures_list):
@@ -66,8 +97,6 @@ def interpolation(height, km, x_axis_distance_list, y_axis_height_list, table_fi
 
     low_y = 0
     high_y = 1
-    print(height)
-    print(y_axis_height_list)
     u = 0
     k = None  # index position in list i.e. k = 2 --> 10
     m = False
@@ -180,9 +209,9 @@ def wind_bs5975(height):
 
     s_wind = topographical_factor * basic_wind_velocity * (1 + (altitude / 1000))
     peak_pressure_bs5975 = 0.5 * air_density * (p_factor ** 2) * (exposure_factor ** 2) * (s_wind ** 2) * (10 ** -3)
-    print("Peak dynamic pressure = " + str(round(peak_pressure_bs5975, 3)))
-    return peak_pressure_bs5975, p_factor, town_country, distance_shore, exposure_factor, basic_wind_velocity,\
-        topographical_factor, altitude, s_wind
+    print("Peak dynamic pressure = " + str(round(peak_pressure_bs5975, 3)) + "kN/m^2")
+    return peak_pressure_bs5975, p_factor, town_country, distance_shore, exposure_factor, basic_wind_velocity, \
+           topographical_factor, altitude, s_wind
 
 
 def wind_bs6399(height):
@@ -303,7 +332,7 @@ def wind_bs6399(height):
         print("Probability factor = " + str(p_factor))
 
         site_wind_speed = basic_wind_velocity * sa * direction_factor * seasonal_factor * p_factor
-        print("Site wind speed = " + str(round(site_wind_speed, 3)))
+        print("Site wind speed = " + str(round(site_wind_speed, 2)) + "m/s")
         upwind_distance_sea = float(input("Upwind distance from sea to site; dsea (in km): "))
         upwind_distance_town = float(input("Upwind distance from edge of town to site; dsite (in km): "))
 
@@ -320,10 +349,10 @@ def wind_bs6399(height):
         print("Interpolated turbulence adjustment factor; Tt: " + str(round(interpolated_tt, 3)))
 
         terrain_building_factor = interpolated_sc * interpolated_tc * (1 + (3.44 * interpolated_st * interpolated_tt))
-        print("Terrain and building factor: " + str(terrain_building_factor))
+        print("Terrain and building factor: " + str(round(terrain_building_factor, 3)))
         effective_wind_speed = site_wind_speed * terrain_building_factor
-        print("Effective wind speed: " + str(effective_wind_speed))
-        dynamic_pressure = 0.613 * (effective_wind_speed ** 2)
+        print("Effective wind speed: " + str(round(effective_wind_speed, 3)) + "m/s")
+        dynamic_pressure = 0.613 * (effective_wind_speed ** 2) * (10 ** -3)
         print("Dynamic pressure = " + str(round(dynamic_pressure, 3)) + "kN/m^2")
     else:
         upwind_distance_town = 0
@@ -363,12 +392,132 @@ def wind_bs6399(height):
         print("Terrain and building factor: " + str(round(terrain_building_factor, 3)))
         effective_wind_speed = site_wind_speed * terrain_building_factor
         print("Effective wind speed: " + str(round(effective_wind_speed, 3)))
-        dynamic_pressure = 0.613 * (effective_wind_speed ** 2)
+        dynamic_pressure = 0.613 * (effective_wind_speed ** 2) * (10 ** -3)
         print("Dynamic pressure = " + str(round(dynamic_pressure, 3)) + "kN/m^2")
     return p_factor, town, upwind_distance_sea, upwind_distance_town, \
-        basic_wind_velocity, altitude, height, building_type_factor, dynamic_augmentation_factor, he, hd, sa, \
-        interpolated_sc, interpolated_st, interpolated_tc, interpolated_tt, ho, xo, terrain_building_factor, \
-        effective_wind_speed, direction_factor, seasonal_factor, site_wind_speed, dynamic_pressure
+           basic_wind_velocity, altitude, height, building_type_factor, dynamic_augmentation_factor, he, hd, sa, \
+           interpolated_sc, interpolated_st, interpolated_tc, interpolated_tt, ho, xo, terrain_building_factor, \
+           effective_wind_speed, direction_factor, seasonal_factor, site_wind_speed, dynamic_pressure
+
+
+def post_design(height, k_factor, return_corners, zone, horizontal_udl, load_case, peak_pressure):
+    while True:
+        print()
+        print("Zone " + zone + " Post Design:")
+        if load_case == "LC1":
+            print("Note: Post design undertaken using LC1 i.e. maximum calculated peak velocity pressure with "
+                  "no horizontal UDL")
+        else:
+            print("Note: Post design undertaken using LC2 i.e. working wind with horizontal UDL (if applicable)")
+        if return_corners == "2":
+            if zone == "B":
+                cp = 2.1
+            elif zone == "C":
+                cp = 1.7
+            else:
+                cp = 1.2
+        else:
+            if zone == "B":
+                cp = 1.8
+            elif zone == "C":
+                cp = 1.4
+            else:
+                cp = 1.2
+        post_width = float(input("Post width (in mm): "))
+        post_depth = float(input("Post depth (in mm): "))
+        area = post_width * post_depth
+        timber_grade = None
+        while True:
+            if (timber_grade == "c16") or (timber_grade == "c24"):
+                break
+            else:
+                timber_grade = input("Timber grade (C16 or C24): ").casefold()
+        k2_bending = 0.8
+        k2_shear = 0.9
+        k2_modulus = 0.8
+        k3 = 1.75
+        k8 = 1
+        grade_list = {"c16": (5.3, 0.67, 5800), "c24": (7.5, 0.71, 7200)}
+        timber_grade = grade_list.get(timber_grade)
+        if post_depth <= 72:
+            k7 = 1.17
+        elif (post_depth > 72) and (post_depth <= 300):
+            k7 = (300 / post_depth) ** 0.11
+        else:
+            k7 = 0.81 * (((post_depth ** 2) + 92300) / ((post_depth ** 2) + 56800))
+        modified_allowable_stress = timber_grade[0] * k2_bending * k3 * k8 * k7
+        modified_allowable_shear = timber_grade[1] * k2_shear * k3 * k8
+        modified_elastic_modulus = timber_grade[2] * k2_modulus
+        modified_shear_modulus = (1 / 16) * modified_elastic_modulus
+        post_spacing = float(input("Post spacing (in metres): "))
+        wind_udl = post_spacing * peak_pressure * cp * k_factor
+        h_pl = horizontal_udl * post_spacing
+        bm = (((wind_udl * (height ** 2)) / 2) + (h_pl * 1.1)) * (10 ** 6)  # in Nmm
+        sf = ((wind_udl * height) + h_pl) * (10 ** 3)  # in N
+        z = (post_width * (post_depth ** 2) / 6)  # in mm^3 (elastic section modulus)
+        i = (post_width * (post_depth ** 3) / 12)  # in mm^4
+        iz = (post_depth * (post_width ** 3) / 12)  # in mm^4 (minor axis second moment of area)
+        if post_depth >= post_width:  # a & b half the length of long and short sides in formula below
+            a = post_depth / 2
+            b = post_width / 2
+        else:
+            a = post_width / 2
+            b = post_depth / 2
+        it = a * (b ** 3) * ((16 / 3) - ((3.36 * (b / a)) * (1 - ((b ** 4) / (12 * (a ** 4))))))  # torsional constant
+
+        # Checks
+
+        print()
+        print("For zone " + zone + " posts of size " + str(post_width) + "mm (w) x " + str(post_depth) + "mm (d):")
+        bending_stress = bm / z
+        bending_utl = bending_stress / modified_allowable_stress
+        if bending_stress <= modified_allowable_stress:
+            pass_fail_bending = "Pass"
+        else:
+            pass_fail_bending = "Fail!"
+        print("Bending stress = " + str(round(bending_stress, 3)) + "N/mm^2 (Utl. " + str(round(bending_utl, 2)) +
+              ") --> " + pass_fail_bending)
+        shear_stress = (3 * sf) / (2 * area)
+        shear_utl = shear_stress / modified_allowable_shear
+        if shear_stress <= modified_allowable_shear:
+            pass_fail_shear = "Pass"
+        else:
+            pass_fail_shear = "Fail!"
+        print("Shear stress = " + str(round(shear_stress, 3)) + "N/mm^2 (Utl. " + str(round(shear_utl, 2)) + ") --> " +
+              pass_fail_shear)
+        db_ratio = post_depth / post_width
+        critical_buckling_stress = (3.14 * ((modified_elastic_modulus * iz * modified_shear_modulus * it)
+                                            ** 0.5)) / (0.8 * height * (10 ** 3) * z)
+        if db_ratio <= 2:
+            pass_fail_db = "Pass"
+        else:
+            pass_fail_db = "Fail!"
+        print("Breadth to depth ratio (max. 2) = " + str(round(db_ratio, 2)) + " --> " + pass_fail_db)
+        crit_buckling_utl = modified_allowable_stress / critical_buckling_stress
+        if pass_fail_db == "Fail!":
+            if critical_buckling_stress >= modified_allowable_stress:
+                print("Calculated critical buckling stress = " + str(round(critical_buckling_stress, 2)) +
+                      "N/mm^2 (Utl. " + str(round(crit_buckling_utl, 2)) + "); therefore section not at risk of "
+                                                                           "buckling --> Pass")
+                pass_fail_db = "Pass"  # stops parameter check failure message
+            else:
+                print("Buckling critical! Section depth to breadth ratio should be re-evaluated.")
+        post_deflection = ((wind_udl * (10 ** 3) * height * ((height * (10 ** 3)) ** 3))
+                           / (8 * modified_elastic_modulus * i)) + (((h_pl * (1100 ** 2))
+                                                                     / (6 * modified_elastic_modulus * i))
+                                                                    * ((3 * height * (10 ** 3)) - 1100))
+        print("Deflection = " + str(round(post_deflection, 1)) + "mm")
+        warning = ""
+        if (pass_fail_bending == "Fail!") or (pass_fail_shear == "Fail!") or (pass_fail_db == "Fail!"):
+            warning = "WARNING! A parameter check has failed! "
+        accept = input(warning + "Accept design? (y/n): ").casefold()
+        if (accept == "y") or (accept == "yes") or (accept == "ye"):
+            break
+    return post_width, post_depth, timber_grade
+
+
+def rail_design(height, k_factor, return_corners, zone, horizontal_udl, load_case, peak_pressure):
+    pass
 
 
 def wind_print_bs5975(doc_name, wind_pressure, probability_factor, town_country, shore_distance, exposure_factor,
